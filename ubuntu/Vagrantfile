@@ -1,0 +1,90 @@
+# encoding: utf-8
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+###########################################################################################################################
+#### PROJECT CONFIGURATION
+###########################################################################################################################
+PROJECT_NAME = ""
+BOOTSTRAP_SHELL_SCRIPT = ""
+###########################################################################################################################
+
+###########################################################################################################################
+#### ENVIRONMENT VARIABLES
+###########################################################################################################################
+ENVIRONMENT_VARIABLES = {
+  "env_git_username" => "",
+  "env_git_email" => ""
+}
+###########################################################################################################################
+
+###########################################################################################################################
+#### NETWORK CONFIGURATION
+###########################################################################################################################
+# https://en.wikipedia.org/wiki/Private_network#Private_IPv4_address_spaces
+STATIC_IP_ADDRESS = ""
+TCP_PORTS_LIST = {}
+UDP_PORTS_LIST = {}
+###########################################################################################################################
+
+###########################################################################################################################
+#### VM Configuration
+###########################################################################################################################
+VM_NAME = PROJECT_NAME + "-dev-vm"
+VM_RAM = 2048
+VM_USER = "vagrant"
+SHARED_HOST_PATH = File.expand_path(File.dirname(__FILE__)) + "/shared"
+SHARED_GUEST_PATH = "/home/" + VM_USER + "/shared"
+###########################################################################################################################
+
+###########################################################################################################################
+#### VAGRANT CONFIGURATION
+###########################################################################################################################
+VAGRANT_BOX = "ubuntu/bionic64"
+VAGRANTFILE_API_VERSION = "2"
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+  config.vm.box = VAGRANT_BOX
+
+  config.vm.hostname = VM_NAME
+  
+  config.vm.provider "virtualbox" do |v|
+    v.name = VM_NAME
+    v.memory = VM_RAM
+  end
+
+  ENVIRONMENT_VARIABLES.store("env_username", VM_USER)
+
+  # STATIC IP ADDRESS
+  if STATIC_IP_ADDRESS == ''
+    config.vm.network "private_network", type: "dhcp"
+  else
+    config.vm.network "private_network", ip: STATIC_IP_ADDRESS
+    ENVIRONMENT_VARIABLES.store("env_ip_address", STATIC_IP_ADDRESS)
+  end
+  
+  # Forwarded Ports
+  TCP_PORTS_LIST.each do |guest, host|
+    config.vm.network "forwarded_port", guest: "#{guest}", host: "#{host}", protocol: "tcp"
+  end
+  UDP_PORTS_LIST.each do |guest, host|
+    config.vm.network "forwarded_port", guest: "#{guest}", host: "#{host}", protocol: "udp"
+  end
+
+  # Shared sync folder
+  config.vm.synced_folder SHARED_HOST_PATH, SHARED_GUEST_PATH, mount_options: [ "dmode=777,fmode=777" ]
+  
+  # Disable default Vagrant folder, use a unique path per project
+  config.vm.synced_folder ".", "/home/" + VM_USER + "", disabled: true
+  
+  # Packages installation
+  config.vm.provision "shell", path: BOOTSTRAP_SHELL_SCRIPT, env: ENVIRONMENT_VARIABLES
+end
+###########################################################################################################################
+
+###########################################################################################################################
+#### HELPER
+###########################################################################################################################
+#
+# SSH Connection:
+#   ssh -i ./.vagrant/machines/default/virtualbox/private_key -o PasswordAuthentication=no VM_USER@STATIC_IP_ADDRESS -p 22
+#
